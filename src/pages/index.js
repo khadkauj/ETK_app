@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { create } from "ipfs-http-client";
 import ABI from "../../Contract/ABI.json";
 import { ethers } from "ethers";
+import KMIteration from "components/KMIteration";
 
 // IPFS details
 const projectId = "2P4qS1ZUL7xTPLJS3NTipkdnW6U";
@@ -35,6 +36,7 @@ export default function Home() {
   const [knowledgeModelName2, setKnowledgeModelName2] = useState("");
   const [contract, setContract] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [KMFromBlockchain, setKMFromBlockchain] = useState([])
   const contractAddress = "0xE3e29e25CbBFDe7EE3B6B608876E2439093b97AC";
 
   // connects to metamask
@@ -149,13 +151,34 @@ export default function Home() {
 
   };
 
+  const getKMFromBlockchain = async() => {
+    if (!walletAddress | !contract) {
+      return
+    }
+
+    try {
+      const tempKM = []
+      const getKM1 = contract.getKnowledgeModel("device0").then(res => setKMFromBlockchain(KM => [...KM,res])).catch(error => console.log("error while getting KM1"))
+      const getKM2 = contract.getKnowledgeModel("device1").then(res => setKMFromBlockchain(KM => [...KM,res])).catch(error => console.log("error while getting KM2"))
+      console.log("Km from", getKM1);
+      setKMFromBlockchain(tempKM)
+    } catch (error) {
+      console.log("Error fetching KM:", error);
+    }
+  }
+
   useEffect(() => {
     connectToMetamask()
   }, []);
 
-  console.log("Hahes1", hashes1);
-  console.log("Hahes2", hashes2);
-  console.log("Hahes2", knowledgeModelName1);
+  useEffect(() => {
+    getKMFromBlockchain()
+  }, [contract])
+  
+
+  // console.log("Hahes1", hashes1);
+  // console.log("Hahes2", hashes2);
+  console.log("KM from blockchain", KMFromBlockchain);
 
   return (
     <>
@@ -239,7 +262,7 @@ export default function Home() {
                     <br />
                     {/* Store in Blockchain */}
                     <Form>
-                      <Form.Group className="mb-3" controlId="formBasicEmail">
+                   {hashes1.length > 0 &&   <Form.Group className="mb-3" controlId="formBasicEmail">
                         <Form.Label>Name of Knowledge Model</Form.Label>
                         <Form.Control
                           type="text"
@@ -248,7 +271,7 @@ export default function Home() {
                             setKnowledgeModelName1(e.target.value)
                           }
                         />
-                      </Form.Group>
+                      </Form.Group>}
 
                       {hashes1.length > 0 && (
                         <Button
@@ -323,7 +346,7 @@ export default function Home() {
                     <br />
                     {/* Store in Blockchain */}
                     <Form>
-                      <Form.Group className="mb-3" controlId="formBasicEmail">
+                  {hashes1.length > 0 &&    <Form.Group className="mb-3" controlId="formBasicEmail">
                         <Form.Label>Name of Knowledge Model</Form.Label>
                         <Form.Control
                           type="text"
@@ -332,7 +355,7 @@ export default function Home() {
                             setKnowledgeModelName2(e.target.value)
                           }
                         />
-                      </Form.Group>
+                      </Form.Group>}
 
                       {hashes2.length > 0 && (
                         <Button
@@ -352,6 +375,10 @@ export default function Home() {
               </div>
             </Col>
           </Row>
+        </Container>
+        {/* Show Modal for KM interation */}
+        <Container>
+          <KMIteration KMFromBlockchain={KMFromBlockchain} />
         </Container>
       </div>
     </>
