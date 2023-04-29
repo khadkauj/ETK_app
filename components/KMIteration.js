@@ -1,14 +1,14 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Button, Modal, Row, Col } from "react-bootstrap";
 
 function KMIteration({ KMFromBlockchain }) {
   console.log("from inside", KMFromBlockchain);
+  const [show, setShow] = useState(false);
 
   if (KMFromBlockchain.length === 0) {
     return <>No Knowledge model available</>;
   }
 
-  const [show, setShow] = useState(false);
 
   const handleClose = () => setShow(false);
   const handleShow = () => setShow(true);
