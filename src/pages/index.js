@@ -1,11 +1,155 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import { Inter } from '@next/font/google'
-import styles from '@/styles/Home.module.css'
+import Modal from "react-bootstrap/Modal";
+import Head from "next/head";
+import { Button, Card, Col, Form, Row } from "react-bootstrap";
+import Container from "react-bootstrap/Container";
+import Nav from "react-bootstrap/Nav";
+import Navbar from "react-bootstrap/Navbar";
+import NavDropdown from "react-bootstrap/NavDropdown";
+import Image from "next/image";
+import { useState } from "react";
+import { create } from "ipfs-http-client";
+import ABI from "../../Contract/ABI.json"
+var Web3 = require('web3');
 
-const inter = Inter({ subsets: ['latin'] })
+
+// IPFS details
+const projectId = "2P4qS1ZUL7xTPLJS3NTipkdnW6U";
+const projectSecret = "5ea6490b5b82d000ca8b1154bcf98c5c";
+const auth =
+  "Basic " + Buffer.from(projectId + ":" + projectSecret).toString("base64");
+
+const ipfs = create({
+  host: "ipfs.infura.io",
+  port: "5001",
+  protocol: "https",
+  headers: {
+    authorization: auth,
+  },
+});
 
 export default function Home() {
+  const [fileName, setFileName] = useState(null);
+  const [hashes1, setHash1] = useState([]);
+  const [hashes2, setHash2] = useState([]);
+  const [arrayOfSectionsOfFile, setArrayOfSectionsOfFile] = useState([]);
+  const [knowledgeModelName1, setKnowledgeModelName1] = useState("");
+  const [knowledgeModelName2, setKnowledgeModelName2] = useState("");
+  const [contract, setContract] = useState("")
+  const contractAddress = "0xA81333Ba9Cf06535f4578A5A8636150454c77151" 
+
+
+  // connects to metamask
+  const connectToMetamask = async() => {
+    if (window.ethereum) {
+      window.web3 = new Web3(window.ethereum)
+      await window.ethereum.enable()
+    }
+    else if (window.web3) {
+      window.web3 = new Web3(window.web3.currentProvider)
+    }
+    else {
+      window.alert('Non-Ethereum browser detected. You should consider trying MetaMask!')
+    }
+  }
+
+  // Fetch Solidity contract
+  const getContract = async (newAccount) => {
+    console.log("inside get contract");
+    const web3 = window.web3
+    // Load account
+    const accounts = await web3.eth.getAccounts()
+    this.setState({ account: accounts[0] })
+    const networkId = await web3.eth.net.getId()
+    const networkData = Image.networks[networkId]
+    if(networkData) {
+      const contract = new web3.eth.Contract(Image.abi, networkData.address)
+      this.setState({ contract })
+      const imageHash = await contract.methods.get().call()
+      this.setState({ imageHash })
+    } else {
+      window.alert('Smart contract not deployed to detected network.')
+    }
+
+  };
+  
+
+  const splitFileContentIntoSections = (fileContent) => {
+    const sections = fileContent
+      .split(/\n\n/)
+      .filter((section) => section.trim() !== "");
+    return sections;
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    setFileName(file);
+    console.log("Uploading file:", file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const fileContent = e.target.result;
+      const sections = splitFileContentIntoSections(fileContent);
+      console.log("Sections:", sections);
+      setArrayOfSectionsOfFile(sections.map((section) => section));
+    };
+    reader.readAsText(file);
+  };
+
+  const generateHash = (e, index) => {
+    console.log("index is", e, index);
+    e.preventDefault();
+    if (!fileName) {
+      console.log("No file selected");
+      return;
+    }
+    console.log("starting to generate hash for text file:", fileName.name);
+
+    if (index===0) {
+      setHash1([])
+    } else if (index ===1){
+      setHash2([])
+    }
+
+    arrayOfSectionsOfFile.forEach((section, indx) => {
+      console.log("adding to ipfs, section: ", section);
+
+      // https://ipfs.io/ipfs/QmTX9pz6msTrYNXLtau49c4qEoG9m6epNzvTh6ick24Xgi
+      const url = ipfs
+        .add(section)
+        .then((res) => {
+          const url = "https://ipfs.io/ipfs/" + res.path;
+          console.log(`url for section ${indx} is:`, url);
+          if (index === 0) {
+            setHash1((prevHash) => [...prevHash, url]);
+          } else if (index === 1) {
+            setHash2((prevHash) => [...prevHash, url]);
+          }
+        })
+        .catch((error) => {
+          console.log("error is:", error);
+        });
+    });
+  };
+
+  const storeInBlockchain = (e, index) => {
+    e.preventDefault();
+    if (!hashes1 & !hashes2 ) {
+      console.log("No file or hash");
+      return;
+    }
+
+    if (index===0) {
+      console.log("Staring to store in Blockchain for: ",  "Device"+index, knowledgeModelName1, hashes1 );
+    }else if(index ===1){
+      console.log("Staring to store in Blockchain for: ",  "Device"+index, knowledgeModelName2 , hashes2);
+    }
+
+  };
+
+  console.log("Hahes1", hashes1);
+  console.log("Hahes2", hashes2);
+  console.log("Hahes2", knowledgeModelName1);
+
   return (
     <>
       <Head>
@@ -14,110 +158,192 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className={styles.main}>
-        <div className={styles.description}>
-          <p>
-            Get started by editing&nbsp;
-            <code className={styles.code}>src/pages/index.js</code>
-          </p>
-          <div>
-            <a
-              href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              By{' '}
-              <Image
-                src="/vercel.svg"
-                alt="Vercel Logo"
-                className={styles.vercelLogo}
-                width={100}
-                height={24}
-                priority
-              />
-            </a>
-          </div>
-        </div>
+      <div>
+        {/* Header */}
+        <Navbar bg="light" expand="lg">
+          <Container>
+            <Navbar.Brand href="/">ETK</Navbar.Brand>
+            <Button onClick={connectToMetamask} size="lg" variant="primary">
+              Signup With Metamask
+            </Button>
+          </Container>
+        </Navbar>
+        {/* Devices */}
 
-        <div className={styles.center}>
-          <Image
-            className={styles.logo}
-            src="/next.svg"
-            alt="Next.js Logo"
-            width={180}
-            height={37}
-            priority
-          />
-          <div className={styles.thirteen}>
-            <Image
-              src="/thirteen.svg"
-              alt="13"
-              width={40}
-              height={31}
-              priority
-            />
-          </div>
-        </div>
+        <Container>
+          <Row>
+            {/* First Device */}
+              <Col key={1}>
+                <div
+                  className="modal show"
+                  style={{ display: "block", position: "initial" }}
+                >
+                  <Modal.Dialog size="lg">
+                    <Modal.Header closeButton>
+                      <Modal.Title>Device 1</Modal.Title>
+                    </Modal.Header>
 
-        <div className={styles.grid}>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Docs <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Find in-depth information about Next.js features and&nbsp;API.
-            </p>
-          </a>
+                    <Modal.Body>
+                      <div style={{ display: "grid", placeItems: "center" }}>
+                        <Image
+                          src="/KM.png"
+                          alt="Picture of the author"
+                          width={50}
+                          height={50}
+                        />
+                      </div>
+                      {/* Generate Hash Form */}
+                      <Form>
+                        <Row className="align-items-center">
+                          <Col sm={9}>
+                            <Form.Group controlId="knowledgeModelFile">
+                              <Form.Label>Upload Knowledge Model</Form.Label>
+                              <Form.Control
+                                type="file"
+                                accept=".txt"
+                                onChange={handleFileUpload}
+                              />
+                            </Form.Group>
+                          </Col>
+                          <Col sm={3}>
+                            <Button
+                              style={{ marginTop: "32px" }}
+                              type="submit"
+                              size="sm"
+                              onClick={(e) => generateHash(e, 0)}
+                            >
+                              Generate Hash
+                            </Button>
+                          </Col>
+                        </Row>
+                      </Form>
+                      {/* Show hashes after hashes are generated */}
+                      {hashes1.length > 0 && (
+                        <Card body>
+                          Hashes Generated:
+                          <br />
+                          {hashes1.map((hash) => hash + "\n")}
+                        </Card>
+                      )}
+                      <br />
+                      {/* Store in Blockchain */}
+                      <Form>
+                        <Form.Group className="mb-3" controlId="formBasicEmail">
+                          <Form.Label>Name of Knowledge Model</Form.Label>
+                          <Form.Control
+                            type="text"
+                            placeholder="Name of Knowledge Model"
+                            onChange={(e) =>
+                              setKnowledgeModelName1(e.target.value)
+                            }
+                          />
+                        </Form.Group>
 
-          <a
-            href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Learn <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Learn about Next.js in an interactive course with&nbsp;quizzes!
-            </p>
-          </a>
+                        { hashes1.length > 0 && (
+                          <Button
+                            onClick={(e) => storeInBlockchain(e, 0)}
+                            variant="primary"
+                            type="submit"
+                            disabled={!knowledgeModelName1}
+                          >
+                            Store in Blockchain
+                          </Button>
+                        )}
+                      </Form>
+                    </Modal.Body>
 
-          <a
-            href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Templates <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Discover and deploy boilerplate example Next.js&nbsp;projects.
-            </p>
-          </a>
+                    <Modal.Footer></Modal.Footer>
+                  </Modal.Dialog>
+                </div>
+              </Col>
+              {/* Second Device */}
+              <Col key={2}>
+                <div
+                  className="modal show"
+                  style={{ display: "block", position: "initial" }}
+                >
+                  <Modal.Dialog size="lg">
+                    <Modal.Header closeButton>
+                      <Modal.Title>Device 2</Modal.Title>
+                    </Modal.Header>
 
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Deploy <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Instantly deploy your Next.js site to a shareable URL
-              with&nbsp;Vercel.
-            </p>
-          </a>
-        </div>
-      </main>
+                    <Modal.Body>
+                      <div style={{ display: "grid", placeItems: "center" }}>
+                        <Image
+                          src="/KM.png"
+                          alt="Picture of the author"
+                          width={50}
+                          height={50}
+                        />
+                      </div>
+                      {/* Generate Hash Form */}
+                      <Form>
+                        <Row className="align-items-center">
+                          <Col sm={9}>
+                            <Form.Group controlId="knowledgeModelFile">
+                              <Form.Label>Upload Knowledge Model</Form.Label>
+                              <Form.Control
+                                type="file"
+                                accept=".txt"
+                                onChange={handleFileUpload}
+                              />
+                            </Form.Group>
+                          </Col>
+                          <Col sm={3}>
+                            <Button
+                              style={{ marginTop: "32px" }}
+                              type="submit"
+                              size="sm"
+                              onClick={(e) => generateHash(e, 1)}
+                            >
+                              Generate Hash
+                            </Button>
+                          </Col>
+                        </Row>
+                      </Form>
+                      {/* Show hashes after hashes are generated */}
+                      {hashes2.length > 0 && (
+                        <Card body>
+                          Hashes Generated:
+                          <br />
+                          {hashes2.map((hash) => hash + "\n")}
+                        </Card>
+                      )}
+                      <br />
+                      {/* Store in Blockchain */}
+                      <Form>
+                        <Form.Group className="mb-3" controlId="formBasicEmail">
+                          <Form.Label>Name of Knowledge Model</Form.Label>
+                          <Form.Control
+                            type="text"
+                            placeholder="Name of Knowledge Model"
+                            onChange={(e) =>
+                              setKnowledgeModelName2(e.target.value)
+                            }
+                          />
+                        </Form.Group>
+
+                        { hashes2.length > 0 && (
+                          <Button
+                            onClick={(e) => storeInBlockchain(e, 1)}
+                            variant="primary"
+                            type="submit"
+                            disabled={!knowledgeModelName1}
+                          >
+                            Store in Blockchain
+                          </Button>
+                        )}
+                      </Form>
+                    </Modal.Body>
+
+                    <Modal.Footer></Modal.Footer>
+                  </Modal.Dialog>
+                </div>
+              </Col>
+
+          </Row>
+        </Container>
+      </div>
     </>
-  )
+  );
 }
