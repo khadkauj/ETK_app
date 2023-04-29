@@ -6,11 +6,10 @@ import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
 import NavDropdown from "react-bootstrap/NavDropdown";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { create } from "ipfs-http-client";
-import ABI from "../../Contract/ABI.json"
-var Web3 = require('web3');
-
+import ABI from "../../Contract/ABI.json";
+import { ethers } from "ethers";
 
 // IPFS details
 const projectId = "2P4qS1ZUL7xTPLJS3NTipkdnW6U";
@@ -34,44 +33,43 @@ export default function Home() {
   const [arrayOfSectionsOfFile, setArrayOfSectionsOfFile] = useState([]);
   const [knowledgeModelName1, setKnowledgeModelName1] = useState("");
   const [knowledgeModelName2, setKnowledgeModelName2] = useState("");
-  const [contract, setContract] = useState("")
-  const contractAddress = "0xA81333Ba9Cf06535f4578A5A8636150454c77151" 
-
+  const [contract, setContract] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const contractAddress = "0xE3e29e25CbBFDe7EE3B6B608876E2439093b97AC";
 
   // connects to metamask
-  const connectToMetamask = async() => {
-    if (window.ethereum) {
-      window.web3 = new Web3(window.ethereum)
-      await window.ethereum.enable()
+  const connectToMetamask = () => {
+    if (window.ethereum && window.ethereum.isMetaMask) {
+      window.ethereum
+        .request({ method: "eth_requestAccounts" })
+        .then((result) => {
+          // connectToETH(result[0]);
+          console.log("Connected to metamask", result);
+          setWalletAddress(result);
+          getContract();
+        })
+        .catch((error) => {
+          console.log("error while logging in metamask", error);
+        });
+    } else {
+      console.log("Need to install MetaMask");
     }
-    else if (window.web3) {
-      window.web3 = new Web3(window.web3.currentProvider)
-    }
-    else {
-      window.alert('Non-Ethereum browser detected. You should consider trying MetaMask!')
-    }
-  }
+  };
 
   // Fetch Solidity contract
   const getContract = async (newAccount) => {
-    console.log("inside get contract");
-    const web3 = window.web3
-    // Load account
-    const accounts = await web3.eth.getAccounts()
-    this.setState({ account: accounts[0] })
-    const networkId = await web3.eth.net.getId()
-    const networkData = Image.networks[networkId]
-    if(networkData) {
-      const contract = new web3.eth.Contract(Image.abi, networkData.address)
-      this.setState({ contract })
-      const imageHash = await contract.methods.get().call()
-      this.setState({ imageHash })
-    } else {
-      window.alert('Smart contract not deployed to detected network.')
+    console.log("Connecting to Contract");
+    try {
+      const provider = await new ethers.providers.Web3Provider(window.ethereum);
+      const address = await provider.send("eth_requestAccounts", []);
+      const signer = provider.getSigner();
+      const ETKContract = new ethers.Contract(contractAddress, ABI, signer);
+      console.log(ETKContract);
+      setContract(ETKContract);
+    } catch (error) {
+      console.log("problems while assigning network", error);
     }
-
   };
-  
 
   const splitFileContentIntoSections = (fileContent) => {
     const sections = fileContent
@@ -104,10 +102,10 @@ export default function Home() {
     }
     console.log("starting to generate hash for text file:", fileName.name);
 
-    if (index===0) {
-      setHash1([])
-    } else if (index ===1){
-      setHash2([])
+    if (index === 0) {
+      setHash1([]);
+    } else if (index === 1) {
+      setHash2([]);
     }
 
     arrayOfSectionsOfFile.forEach((section, indx) => {
@@ -131,20 +129,29 @@ export default function Home() {
     });
   };
 
-  const storeInBlockchain = (e, index) => {
+  const storeInBlockchain = async(e, index) => {
     e.preventDefault();
-    if (!hashes1 & !hashes2 ) {
+    if (!hashes1 & !hashes2) {
       console.log("No file or hash");
       return;
     }
 
-    if (index===0) {
-      console.log("Staring to store in Blockchain for: ",  "Device"+index, knowledgeModelName1, hashes1 );
-    }else if(index ===1){
-      console.log("Staring to store in Blockchain for: ",  "Device"+index, knowledgeModelName2 , hashes2);
+    const hashes = index === 0 ? hashes1 : hashes2
+    const name = index === 0 ? knowledgeModelName1 : knowledgeModelName2
+    const deviceId = "device"+index
+
+    try {
+      const addKM = contract.addKnowledgeModel(deviceId, name, hashes)
+      console.log("Added Knowledge Model", addKM);
+    } catch (error) {
+      console.log("Error:", error);
     }
 
   };
+
+  useEffect(() => {
+    connectToMetamask()
+  }, []);
 
   console.log("Hahes1", hashes1);
   console.log("Hahes2", hashes2);
@@ -163,9 +170,13 @@ export default function Home() {
         <Navbar bg="light" expand="lg">
           <Container>
             <Navbar.Brand href="/">ETK</Navbar.Brand>
-            <Button onClick={connectToMetamask} size="lg" variant="primary">
-              Signup With Metamask
-            </Button>
+            {!walletAddress ? (
+              <Button onClick={connectToMetamask} size="lg" variant="primary">
+                Signup With Metamask
+              </Button>
+            ) : (
+              "Wallet Address: " + walletAddress
+            )}
           </Container>
         </Navbar>
         {/* Devices */}
@@ -173,174 +184,173 @@ export default function Home() {
         <Container>
           <Row>
             {/* First Device */}
-              <Col key={1}>
-                <div
-                  className="modal show"
-                  style={{ display: "block", position: "initial" }}
-                >
-                  <Modal.Dialog size="lg">
-                    <Modal.Header closeButton>
-                      <Modal.Title>Device 1</Modal.Title>
-                    </Modal.Header>
+            <Col key={1}>
+              <div
+                className="modal show"
+                style={{ display: "block", position: "initial" }}
+              >
+                <Modal.Dialog size="lg">
+                  <Modal.Header closeButton>
+                    <Modal.Title>Device 0</Modal.Title>
+                  </Modal.Header>
 
-                    <Modal.Body>
-                      <div style={{ display: "grid", placeItems: "center" }}>
-                        <Image
-                          src="/KM.png"
-                          alt="Picture of the author"
-                          width={50}
-                          height={50}
+                  <Modal.Body>
+                    <div style={{ display: "grid", placeItems: "center" }}>
+                      <Image
+                        src="/KM.png"
+                        alt="Picture of the author"
+                        width={50}
+                        height={50}
+                      />
+                    </div>
+                    {/* Generate Hash Form */}
+                    <Form>
+                      <Row className="align-items-center">
+                        <Col sm={9}>
+                          <Form.Group controlId="knowledgeModelFile">
+                            <Form.Label>Upload Knowledge Model</Form.Label>
+                            <Form.Control
+                              type="file"
+                              accept=".txt"
+                              onChange={handleFileUpload}
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col sm={3}>
+                          <Button
+                            style={{ marginTop: "32px" }}
+                            type="submit"
+                            size="sm"
+                            onClick={(e) => generateHash(e, 0)}
+                          >
+                            Generate Hash
+                          </Button>
+                        </Col>
+                      </Row>
+                    </Form>
+                    {/* Show hashes after hashes are generated */}
+                    {hashes1.length > 0 && (
+                      <Card body>
+                        Hashes Generated:
+                        <br />
+                        {hashes1.map((hash) => hash + "\n")}
+                      </Card>
+                    )}
+                    <br />
+                    {/* Store in Blockchain */}
+                    <Form>
+                      <Form.Group className="mb-3" controlId="formBasicEmail">
+                        <Form.Label>Name of Knowledge Model</Form.Label>
+                        <Form.Control
+                          type="text"
+                          placeholder="Name of Knowledge Model"
+                          onChange={(e) =>
+                            setKnowledgeModelName1(e.target.value)
+                          }
                         />
-                      </div>
-                      {/* Generate Hash Form */}
-                      <Form>
-                        <Row className="align-items-center">
-                          <Col sm={9}>
-                            <Form.Group controlId="knowledgeModelFile">
-                              <Form.Label>Upload Knowledge Model</Form.Label>
-                              <Form.Control
-                                type="file"
-                                accept=".txt"
-                                onChange={handleFileUpload}
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col sm={3}>
-                            <Button
-                              style={{ marginTop: "32px" }}
-                              type="submit"
-                              size="sm"
-                              onClick={(e) => generateHash(e, 0)}
-                            >
-                              Generate Hash
-                            </Button>
-                          </Col>
-                        </Row>
-                      </Form>
-                      {/* Show hashes after hashes are generated */}
+                      </Form.Group>
+
                       {hashes1.length > 0 && (
-                        <Card body>
-                          Hashes Generated:
-                          <br />
-                          {hashes1.map((hash) => hash + "\n")}
-                        </Card>
+                        <Button
+                          onClick={(e) => storeInBlockchain(e, 0)}
+                          variant="primary"
+                          type="submit"
+                          disabled={!knowledgeModelName1}
+                        >
+                          Store in Blockchain
+                        </Button>
                       )}
-                      <br />
-                      {/* Store in Blockchain */}
-                      <Form>
-                        <Form.Group className="mb-3" controlId="formBasicEmail">
-                          <Form.Label>Name of Knowledge Model</Form.Label>
-                          <Form.Control
-                            type="text"
-                            placeholder="Name of Knowledge Model"
-                            onChange={(e) =>
-                              setKnowledgeModelName1(e.target.value)
-                            }
-                          />
-                        </Form.Group>
+                    </Form>
+                  </Modal.Body>
 
-                        { hashes1.length > 0 && (
+                  <Modal.Footer></Modal.Footer>
+                </Modal.Dialog>
+              </div>
+            </Col>
+            {/* Second Device */}
+            <Col key={2}>
+              <div
+                className="modal show"
+                style={{ display: "block", position: "initial" }}
+              >
+                <Modal.Dialog size="lg">
+                  <Modal.Header closeButton>
+                    <Modal.Title>Device 1</Modal.Title>
+                  </Modal.Header>
+
+                  <Modal.Body>
+                    <div style={{ display: "grid", placeItems: "center" }}>
+                      <Image
+                        src="/KM.png"
+                        alt="Picture of the author"
+                        width={50}
+                        height={50}
+                      />
+                    </div>
+                    {/* Generate Hash Form */}
+                    <Form>
+                      <Row className="align-items-center">
+                        <Col sm={9}>
+                          <Form.Group controlId="knowledgeModelFile">
+                            <Form.Label>Upload Knowledge Model</Form.Label>
+                            <Form.Control
+                              type="file"
+                              accept=".txt"
+                              onChange={handleFileUpload}
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col sm={3}>
                           <Button
-                            onClick={(e) => storeInBlockchain(e, 0)}
-                            variant="primary"
+                            style={{ marginTop: "32px" }}
                             type="submit"
-                            disabled={!knowledgeModelName1}
+                            size="sm"
+                            onClick={(e) => generateHash(e, 1)}
                           >
-                            Store in Blockchain
+                            Generate Hash
                           </Button>
-                        )}
-                      </Form>
-                    </Modal.Body>
-
-                    <Modal.Footer></Modal.Footer>
-                  </Modal.Dialog>
-                </div>
-              </Col>
-              {/* Second Device */}
-              <Col key={2}>
-                <div
-                  className="modal show"
-                  style={{ display: "block", position: "initial" }}
-                >
-                  <Modal.Dialog size="lg">
-                    <Modal.Header closeButton>
-                      <Modal.Title>Device 2</Modal.Title>
-                    </Modal.Header>
-
-                    <Modal.Body>
-                      <div style={{ display: "grid", placeItems: "center" }}>
-                        <Image
-                          src="/KM.png"
-                          alt="Picture of the author"
-                          width={50}
-                          height={50}
+                        </Col>
+                      </Row>
+                    </Form>
+                    {/* Show hashes after hashes are generated */}
+                    {hashes2.length > 0 && (
+                      <Card body>
+                        Hashes Generated:
+                        <br />
+                        {hashes2.map((hash) => hash + "\n")}
+                      </Card>
+                    )}
+                    <br />
+                    {/* Store in Blockchain */}
+                    <Form>
+                      <Form.Group className="mb-3" controlId="formBasicEmail">
+                        <Form.Label>Name of Knowledge Model</Form.Label>
+                        <Form.Control
+                          type="text"
+                          placeholder="Name of Knowledge Model"
+                          onChange={(e) =>
+                            setKnowledgeModelName2(e.target.value)
+                          }
                         />
-                      </div>
-                      {/* Generate Hash Form */}
-                      <Form>
-                        <Row className="align-items-center">
-                          <Col sm={9}>
-                            <Form.Group controlId="knowledgeModelFile">
-                              <Form.Label>Upload Knowledge Model</Form.Label>
-                              <Form.Control
-                                type="file"
-                                accept=".txt"
-                                onChange={handleFileUpload}
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col sm={3}>
-                            <Button
-                              style={{ marginTop: "32px" }}
-                              type="submit"
-                              size="sm"
-                              onClick={(e) => generateHash(e, 1)}
-                            >
-                              Generate Hash
-                            </Button>
-                          </Col>
-                        </Row>
-                      </Form>
-                      {/* Show hashes after hashes are generated */}
+                      </Form.Group>
+
                       {hashes2.length > 0 && (
-                        <Card body>
-                          Hashes Generated:
-                          <br />
-                          {hashes2.map((hash) => hash + "\n")}
-                        </Card>
+                        <Button
+                          onClick={(e) => storeInBlockchain(e, 1)}
+                          variant="primary"
+                          type="submit"
+                          disabled={!knowledgeModelName1}
+                        >
+                          Store in Blockchain
+                        </Button>
                       )}
-                      <br />
-                      {/* Store in Blockchain */}
-                      <Form>
-                        <Form.Group className="mb-3" controlId="formBasicEmail">
-                          <Form.Label>Name of Knowledge Model</Form.Label>
-                          <Form.Control
-                            type="text"
-                            placeholder="Name of Knowledge Model"
-                            onChange={(e) =>
-                              setKnowledgeModelName2(e.target.value)
-                            }
-                          />
-                        </Form.Group>
+                    </Form>
+                  </Modal.Body>
 
-                        { hashes2.length > 0 && (
-                          <Button
-                            onClick={(e) => storeInBlockchain(e, 1)}
-                            variant="primary"
-                            type="submit"
-                            disabled={!knowledgeModelName1}
-                          >
-                            Store in Blockchain
-                          </Button>
-                        )}
-                      </Form>
-                    </Modal.Body>
-
-                    <Modal.Footer></Modal.Footer>
-                  </Modal.Dialog>
-                </div>
-              </Col>
-
+                  <Modal.Footer></Modal.Footer>
+                </Modal.Dialog>
+              </div>
+            </Col>
           </Row>
         </Container>
       </div>
