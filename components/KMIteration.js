@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Modal, Row, Col } from "react-bootstrap";
 
-function KMIteration({ KMFromBlockchain }) {
+function KMIteration({ KMFromBlockchain, KMFromBlockchain2 }) {
   console.log("from inside", KMFromBlockchain);
   const [show, setShow] = useState(false);
 
@@ -57,11 +57,11 @@ function KMIteration({ KMFromBlockchain }) {
                   <Modal.Title>Device1</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                  {KMFromBlockchain[0][0]}
+                  {KMFromBlockchain2[0][0]}
                   <br />
-                  {KMFromBlockchain[0][1]}
+                  {KMFromBlockchain2[0][1]}
                   <br />
-                  {KMFromBlockchain[0][2].map((elem) => (
+                  {KMFromBlockchain2[0][2].map((elem) => (
                     <>
                       {elem}
                       <br />

@@ -37,6 +37,7 @@ export default function Home() {
   const [contract, setContract] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [KMFromBlockchain, setKMFromBlockchain] = useState([])
+  const [KMFromBlockchain2, setKMFromBlockchain2] = useState([])
   const contractAddress = "0xE3e29e25CbBFDe7EE3B6B608876E2439093b97AC";
 
   // connects to metamask
@@ -73,6 +74,7 @@ export default function Home() {
     }
   };
 
+  // Segment KM into batches
   const splitFileContentIntoSections = (fileContent) => {
     const sections = fileContent
       .split(/\n\n/)
@@ -159,7 +161,7 @@ export default function Home() {
     try {
       const tempKM = []
       const getKM1 = contract.getKnowledgeModel("device0").then(res => setKMFromBlockchain(KM => [...KM,res])).catch(error => console.log("error while getting KM1"))
-      const getKM2 = contract.getKnowledgeModel("device1").then(res => setKMFromBlockchain(KM => [...KM,res])).catch(error => console.log("error while getting KM2"))
+      const getKM2 = contract.getKnowledgeModel("device1").then(res => setKMFromBlockchain2(KM => [...KM,res])).catch(error => console.log("error while getting KM2"))
       console.log("Km from", getKM1);
       setKMFromBlockchain(tempKM)
     } catch (error) {
@@ -378,7 +380,7 @@ export default function Home() {
         </Container>
         {/* Show Modal for KM interation */}
         <Container>
-          <KMIteration KMFromBlockchain={KMFromBlockchain} />
+          <KMIteration KMFromBlockchain={KMFromBlockchain} KMFromBlockchain2={KMFromBlockchain2} />
         </Container>
       </div>
     </>
